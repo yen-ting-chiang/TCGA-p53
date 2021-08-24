@@ -36,7 +36,8 @@ RNAseq_data <- GDCprepare(query,
 
 #deseq2 RowData prepare----------------------------------------------------
 
-#load("BRCA_RNAseq_counts.rda")
+load("BRCA_RNAseq_counts.rda")
+RNAseq_data <- data
 RNAseq_data_matrix= as.data.frame(assay(RNAseq_data))
 save(RNAseq_data_matrix,
      file = "BRCA_RNAseq_data_matrix.rdata")
@@ -45,15 +46,17 @@ write.csv(RNAseq_data_matrix,
           row.names = TRUE,
           col.names = TRUE,
           quote=FALSE)
-#load("BRCA_RNAseq_data_matrix.rdata")
-colnames(RNAseq_data_matrix)=
-  gsub("-\\S\\S\\S-\\S\\S\\S-\\S\\S\\S\\S-\\S\\S$", 
-       "",
-       colnames(RNAseq_data_matrix))
+load("BRCA_RNAseq_data_matrix.rdata")
 
-write.csv(RNAseq_data_matrix, 
-          file="TCGA_BRCA_RowData.csv", 
-          row.names = TRUE,
+RNAseq_data_matrix_sample <- RNAseq_data_matrix
+colnames(RNAseq_data_matrix_sample)=
+  gsub("\\S-\\S\\S\\S-\\S\\S\\S\\S-\\S\\S$", 
+       "",
+       colnames(RNAseq_data_matrix_sample))
+
+
+write.csv(RNAseq_data_matrix_sample, 
+          file="RNAseq_data_matrix_sample.csv",
           quote=FALSE)
 
 
@@ -67,13 +70,13 @@ save(BRCA.muse.maf,
      file = "BRCA.muse.maf.rdata")
 
 
-#load("BRCA.muse.maf.rdata")
+load("BRCA.muse.maf.rdata")
 #BRCA.muse.maf=read.csv("TCGA.BRCA.muse.59a84472-27d4-497c-8f37-8bc447ff9374.DR-10.0.somatic.maf.csv",  header=FALSE, stringsAsFactors = FALSE)
 
 
 BRCA.muse.maf_TP53_clean=BRCA.muse.maf %>% 
   filter(Hugo_Symbol=="TP53") %>% 
-  mutate(Tumor_Case_Barcode=gsub("-\\S\\S\\S-\\S\\S\\S-\\S\\S\\S\\S-\\S\\S$", 
+  mutate(Tumor_Case_Barcode=gsub("\\S-\\S\\S\\S-\\S\\S\\S\\S-\\S\\S$", 
                                  "",
                                  Tumor_Sample_Barcode))%>%
   select(Tumor_Case_Barcode,
@@ -89,17 +92,20 @@ BRCA.muse.maf_TP53_clean=BRCA.muse.maf %>%
 
 write.csv(BRCA.muse.maf_TP53_clean, 
           file="BRCA.muse.maf_TP53_clean.csv", 
-          row.names = FALSE,
-          col.names = TRUE, 
           quote=FALSE)
 
 #create list of all case IDs with mutation data-------------------------------
 BRCA.muse.maf_case_list=BRCA.muse.maf%>%
-  mutate(Tumor_Case_Barcode=gsub("-\\S\\S\\S-\\S\\S\\S-\\S\\S\\S\\S-\\S\\S$", 
+  mutate(Tumor_Case_Barcode=gsub("\\S-\\S\\S\\S-\\S\\S\\S\\S-\\S\\S$", 
                                  "",
                                  Tumor_Sample_Barcode))%>%
   select(Tumor_Case_Barcode)
-BRCA.muse.maf_case_list=unique(BRCA.muse.maf_case_list)
+write.csv(BRCA.muse.maf_case_list,
+          file = "BRCA.muse.maf_case_list.csv")
+
+BRCA.muse.maf_case_list_unique <- BRCA.muse.maf_case_list
+BRCA.muse.maf_case_list_unique=unique(BRCA.muse.maf_case_list_unique)
+#write.csv(BRCA.muse.maf_case_list_unique, file = "BRCA.muse.maf_case_list_unique.csv")
 
 write.csv(BRCA.muse.maf_case_list, 
           file="BRCA.muse.maf_case_list.csv", 
@@ -114,14 +120,14 @@ write.csv(BRCA.muse.maf_case_list,
 #create the RowData that matches the ColData--------------------------------------------------------
 
 #delete duplicated RNAseq data
-RNAseq_data_matrix_delete_duplicated <- 
-  RNAseq_data_matrix[, !duplicated(colnames(RNAseq_data_matrix))]
+RNAseq_data_matrix_sample_delete_duplicated <- 
+  RNAseq_data_matrix_sample[, !duplicated(colnames(RNAseq_data_matrix_sample))]
 
-mutation_list <- BRCA.muse.maf_case_list[,1, drop = TRUE]
+mutation_list <- BRCA.muse.maf_case_list_unique[,1, drop = TRUE]
 
 #select samples that have mutation data
 RowData <- 
-  RNAseq_data_matrix_delete_duplicated[, colnames(RNAseq_data_matrix_delete_duplicated)%in%
+  RNAseq_data_matrix_sample_delete_duplicated[, colnames(RNAseq_data_matrix_sample_delete_duplicated)%in%
                                          (mutation_list)]
 write.csv(RowData, file = "RowData.csv")
 
