@@ -113,10 +113,6 @@ write.csv(BRCA.muse.maf_case_list,
           col.names = TRUE, 
           quote=FALSE)
 
-#create the Coldata manually
-
-
-
 #create the RowData that matches the ColData--------------------------------------------------------
 
 #delete duplicated RNAseq data
@@ -129,9 +125,72 @@ mutation_list <- BRCA.muse.maf_case_list_unique[,1, drop = TRUE]
 RowData <- 
   RNAseq_data_matrix_sample_delete_duplicated[, colnames(RNAseq_data_matrix_sample_delete_duplicated)%in%
                                          (mutation_list)]
-write.csv(RowData, file = "RowData.csv")
+
+# save(RowData, 
+#      file = "RowData.rdata")
+# save(BRCA.muse.maf_TP53_clean, 
+#      file = "BRCA.muse.maf_TP53_clean.rdata")
+# save(BRCA.muse.maf_case_list_unique, 
+#      file = "BRCA.muse.maf_case_list_unique.rdata")
+# write.csv(RowData, file = "RowData.csv")
+
+load("RowData.rdata")
+load("BRCA.muse.maf_TP53_clean.rdata")
+laod("BRCA.muse.maf_case_list_unique.rdata")
+
+
+#create the TP53-WT sample Coldata -----------
+
+samples_with_TP53_MT_list <- BRCA.muse.maf_TP53_clean[,1, drop = TRUE]
+samples_with_TP53_MT_list_unique <- unique(samples_with_TP53_MT_list)
+
+
+DF1 <- data.frame(mutation_list)
+DF1.1 <- DF1 %>% filter(mutation_list %in% 
+                          samples_with_TP53_MT_list_unique == FALSE) %>% 
+  mutate(Protein_position = "WT", HGVSp_Short = "WT", IMPACT = "WT")
+colnames(DF1.1)[1] <- "Tumor_Case_Barcode"
+
+#create the TP53-double-mutation sample Coldata -----------
+
+DF2 <- data.frame(mutation_list)
+DF2.1 <- BRCA.muse.maf_TP53_clean %>% 
+  filter(duplicated(Tumor_Case_Barcode) == TRUE)%>% 
+  select(Tumor_Case_Barcode, Protein_position, HGVSp_Short, IMPACT)%>% 
+  mutate(Protein_position = "DB", HGVSp_Short = "DB", IMPACT = "DB")
+
+#create the TP53-single-mutation sample Coldata -----------
+DF3 <-  BRCA.muse.maf_TP53_clean%>% 
+  select(Tumor_Case_Barcode, Protein_position, HGVSp_Short, IMPACT) %>% 
+  filter(Tumor_Case_Barcode %in% DF2.1[,1, drop = TRUE] == FALSE)
+
+
+#combine ColDatas----------------------------------------------------
+DF4 <- full_join(DF1.1, DF2.1, 
+          by = c("Tumor_Case_Barcode", 
+                 "Protein_position", 
+                 "HGVSp_Short", 
+                 "IMPACT"))
+
+DF5 <- full_join(DF4, DF3, 
+                     by = c("Tumor_Case_Barcode", 
+                            "Protein_position", 
+                            "HGVSp_Short", 
+                            "IMPACT"))
+
+ColData <- DF5 %>% 
+  filter(Tumor_Case_Barcode %in% colnames(RowData) == TRUE)
+
+# save(ColData, file = "ColData.rdata")
+# write.csv(ColData, file = "ColData.csv")
+load("ColData.rdata")
+
 
 #launch DESeq2 analysis----------------------------------------------
+
+load("RowData.rdata")
+load("ColData.rdata")
+
 library("DESeq2")
 #cts <- RowData_match
 cts= read.csv('TCGA_BRCA_RowData_match.csv',
@@ -145,9 +204,10 @@ coldata= read.table('TCGA_BRCA_ColData.txt',
                     stringsAsFactors = FALSE)
 
 
-dds <- DESeqDataSetFromMatrix(countData = cts2,
-                              colData = coldata,
+dds <- DESeqDataSetFromMatrix(countData = as.matrix(RowData),
+                              colData = ColData,
                               design= ~ IMPACT)
+
 dds$IMPACT <- relevel(dds$IMPACT, ref = "WT")
 dds <- DESeq(dds)
 dds
